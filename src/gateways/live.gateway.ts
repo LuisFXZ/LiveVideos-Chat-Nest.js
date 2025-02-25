@@ -14,6 +14,7 @@ import { Logger } from '@nestjs/common';
   cors: {
     origin: '*',
   },
+  transports: ['websocket']
 })
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(LiveGateway.name);
@@ -65,6 +66,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const count = this.liveRooms.get(roomId)?.size || 0;
       this.viewerCounts.set(roomId, count);
       this.server.to(roomId).emit('viewerCountUpdate', { count });
+      this.logger.log(`Viewers actualizados en sala ${roomId}: ${count}`);
     } catch (error) {
       this.logger.error(`Error in updateViewerCount: ${error.message}`);
     }
@@ -85,9 +87,7 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       const streamerId = this.streamers.get(roomId);
       if (streamerId) {
-        this.server.to(streamerId).emit('newViewer', {
-          viewerId: client.id
-        });
+        client.emit('newStreamer', { streamerId });
       }
 
       return { 
@@ -149,11 +149,22 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('streamOffer')
   handleStreamOffer(client: Socket, { liveId, offer, viewerId }) {
-    const roomId = `live_${liveId}`;
-    client.to(viewerId).emit('streamOffer', {
-      offer,
-      streamerId: client.id
-    });
+    try {
+      const roomId = `live_${liveId}`;
+      const streamerId = this.streamers.get(roomId);
+      
+      if (!streamerId) {
+        throw new WsException('No hay streamer disponible');
+      }
+
+      this.server.to(streamerId).emit('streamOffer', {
+        offer,
+        viewerId: client.id
+      });
+    } catch (error) {
+      this.logger.error(`Error en handleStreamOffer: ${error.message}`);
+      throw new WsException(error.message);
+    }
   }
 
   @SubscribeMessage('requestStream')
@@ -176,19 +187,29 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('streamAnswer')
-  handleStreamAnswer(client: Socket, { answer, viewerId }) {
-    client.to(viewerId).emit('streamAnswer', { 
-      answer, 
-      streamerId: client.id 
-    });
+  handleStreamAnswer(client: Socket, { answer, viewerId, liveId }) {
+    try {
+      this.server.to(viewerId).emit('streamAnswer', {
+        answer,
+        streamerId: client.id
+      });
+    } catch (error) {
+      this.logger.error(`Error en handleStreamAnswer: ${error.message}`);
+      throw new WsException(error.message);
+    }
   }
 
   @SubscribeMessage('iceCandidate')
-  handleIceCandidate(client: Socket, { candidate, targetId }) {
-    client.to(targetId).emit('iceCandidate', { 
-      candidate, 
-      senderId: client.id 
-    });
+  handleIceCandidate(client: Socket, { candidate, targetId, liveId }) {
+    try {
+      this.server.to(targetId).emit('iceCandidate', {
+        candidate,
+        senderId: client.id
+      });
+    } catch (error) {
+      this.logger.error(`Error en handleIceCandidate: ${error.message}`);
+      throw new WsException(error.message);
+    }
   }
 
   @SubscribeMessage('newComment')

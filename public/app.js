@@ -4,7 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let peerConnection = null;
     const peerConnections = {};
     const API_URL = 'http://localhost:3000/api';
-    const socket = io(API_URL);
+    const socket = io('http://localhost:3000', {
+        path: '/socket.io',
+        transports: ['websocket']
+    });
     
     // Configuración de WebRTC
     const configuration = {
@@ -20,43 +23,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
     socket.on('newStreamer', async ({ streamerId }) => {
         console.log('Nuevo streamer detectado:', streamerId);
-        if (streamerId !== socket.id) { // Si no somos el streamer
+        if (streamerId !== socket.id) { // Si somos viewer
             try {
                 // Crear peer connection para el viewer
-                peerConnection = new RTCPeerConnection(configuration);
+                const peerConnection = new RTCPeerConnection(configuration);
                 peerConnections[streamerId] = peerConnection;
 
                 // Configurar el video remoto cuando lleguen los tracks
                 peerConnection.ontrack = (event) => {
+                    console.log('Track recibido:', event);
                     const remoteVideo = document.getElementById('remoteVideo');
                     if (remoteVideo && event.streams && event.streams[0]) {
                         remoteVideo.srcObject = event.streams[0];
                         remoteVideo.classList.remove('hidden');
+                        remoteVideo.play().catch(e => console.error('Error playing video:', e));
                     }
                 };
 
-                // Enviar candidatos ICE al streamer
-                peerConnection.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        socket.emit('iceCandidate', {
-                            candidate: event.candidate,
-                            targetId: streamerId
-                        });
-                    }
-                };
-
-                // Crear y enviar oferta al streamer
+                // Crear y enviar oferta
                 const offer = await peerConnection.createOffer({
                     offerToReceiveAudio: true,
                     offerToReceiveVideo: true
                 });
                 await peerConnection.setLocalDescription(offer);
                 
+                // Enviar oferta al streamer
                 socket.emit('streamOffer', {
                     liveId: currentLiveId,
-                    offer: offer,
+                    offer,
                     viewerId: socket.id
                 });
+
+                // Manejar candidatos ICE
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('iceCandidate', {
+                            candidate: event.candidate,
+                            targetId: streamerId,
+                            liveId: currentLiveId
+                        });
+                    }
+                };
             } catch (error) {
                 console.error('Error conectando con el streamer:', error);
             }
@@ -89,9 +96,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('streamOffer', async ({ offer, viewerId }) => {
-        if (!localStream) return;
-
         try {
+            console.log('Recibida oferta de viewer:', viewerId);
+            if (!localStream) {
+                console.error('No hay stream local disponible');
+                return;
+            }
+
             const peerConnection = new RTCPeerConnection(configuration);
             peerConnections[viewerId] = peerConnection;
 
@@ -105,7 +116,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (event.candidate) {
                     socket.emit('iceCandidate', {
                         candidate: event.candidate,
-                        targetId: viewerId
+                        targetId: viewerId,
+                        liveId: currentLiveId
                     });
                 }
             };
@@ -115,26 +127,39 @@ document.addEventListener('DOMContentLoaded', () => {
             const answer = await peerConnection.createAnswer();
             await peerConnection.setLocalDescription(answer);
 
+            // Enviar respuesta al viewer
             socket.emit('streamAnswer', {
                 answer,
-                viewerId
+                viewerId,
+                liveId: currentLiveId
             });
         } catch (error) {
-            console.error('Error handling viewer offer:', error);
+            console.error('Error procesando oferta del viewer:', error);
         }
     });
 
     socket.on('streamAnswer', async ({ answer, streamerId }) => {
-        const pc = peerConnections[streamerId];
-        if (pc) {
-            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        try {
+            console.log('Recibida respuesta del streamer:', streamerId);
+            const peerConnection = peerConnections[streamerId];
+            if (peerConnection) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+                console.log('Conexión establecida con el streamer');
+            }
+        } catch (error) {
+            console.error('Error procesando respuesta del streamer:', error);
         }
     });
 
     socket.on('iceCandidate', async ({ candidate, senderId }) => {
-        const pc = peerConnections[senderId];
-        if (pc) {
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        try {
+            const peerConnection = peerConnections[senderId];
+            if (peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+                console.log('Candidato ICE agregado para:', senderId);
+            }
+        } catch (error) {
+            console.error('Error agregando candidato ICE:', error);
         }
     });
 
@@ -214,14 +239,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Al inicio del archivo, después de las variables globales
-    const handleRoute = () => {
+    const handleRoute = async () => {
         const path = window.location.pathname;
         const liveMatch = path.match(/\/live\/(\d+)/);
         
         if (liveMatch) {
             const liveId = parseInt(liveMatch[1]);
-            viewLive(liveId, false);
+            // Ocultar el formulario de creación cuando se está viendo un live
+            document.querySelector('.bg-white.p-6.rounded-lg.shadow-md.mb-8').classList.add('hidden');
+            await viewLive(liveId, false);
         } else {
+            // Mostrar el formulario de creación en la página principal
+            document.querySelector('.bg-white.p-6.rounded-lg.shadow-md.mb-8').classList.remove('hidden');
             loadLives();
         }
     };
@@ -317,14 +346,35 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const liveDetails = document.getElementById('liveDetails');
             liveDetails.innerHTML = `
-                <button onclick="goBack()" class="mb-4 text-blue-500 hover:text-blue-600">
-                    ← Volver a la lista
-                </button>
-                <h3 class="text-xl font-bold">${live.title}</h3>
-                <p class="text-gray-600 mt-2">${live.description}</p>
-                <p class="text-sm text-gray-500 mt-1">Creado por: ${live.creatorName}</p>
-                <div class="mt-2 text-sm font-semibold">
-                    <span id="viewerCount">0</span> viewers
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="goBack()" class="text-blue-500 hover:text-blue-600 flex items-center">
+                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                        </svg>
+                        Volver a la lista
+                    </button>
+                    ${live.isActive ? `
+                        <span class="flex items-center">
+                            <span class="inline-block w-2 h-2 bg-red-500 rounded-full live-indicator mr-2"></span>
+                            <span class="text-red-500 font-medium">EN VIVO</span>
+                        </span>
+                    ` : ''}
+                </div>
+                <h3 class="text-2xl font-bold mb-2">${live.title}</h3>
+                <p class="text-gray-600 mb-4">${live.description}</p>
+                <div class="flex items-center justify-between mb-6">
+                    <p class="text-sm text-gray-500">
+                        <span class="font-medium">Creador:</span> ${live.creatorName}
+                    </p>
+                    <div class="flex items-center">
+                        <svg class="w-4 h-4 text-gray-600 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                        </svg>
+                        <span id="viewerCount" class="text-gray-600 font-medium">0</span> viewers
+                    </div>
                 </div>
             `;
 
@@ -347,12 +397,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const shareElement = document.createElement('div');
                 shareElement.className = 'mt-4 p-4 bg-gray-100 rounded';
                 shareElement.innerHTML = `
-                    <p class="mb-2">Comparte este enlace con tus viewers:</p>
+                    <p class="mb-2 font-medium">Comparte este enlace con tus viewers:</p>
                     <div class="flex items-center gap-2">
                         <input type="text" value="${shareUrl}" 
-                               class="flex-1 p-2 border rounded" readonly>
+                               class="flex-1 p-2 border rounded bg-white" readonly>
                         <button onclick="copyShareLink()" 
-                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-200">
                             Copiar
                         </button>
                     </div>
@@ -385,7 +435,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const localVideo = document.getElementById('localVideo');
             localVideo.srcObject = localStream;
-            localVideo.play();
+            await localVideo.play();
 
             // Notificar al servidor que estamos iniciando el stream
             socket.emit('startStream', {
@@ -520,6 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Agregar el manejador para actualización de viewers
     socket.on('viewerCountUpdate', ({ count }) => {
+        console.log('Actualización de viewers:', count);
         const viewerCountElement = document.getElementById('viewerCount');
         if (viewerCountElement) {
             viewerCountElement.textContent = count;
@@ -529,6 +580,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Función para volver a la lista
     window.goBack = () => {
         window.history.pushState({}, '', '/');
+        // Mostrar el formulario de creación al volver
+        document.querySelector('.bg-white.p-6.rounded-lg.shadow-md.mb-8').classList.remove('hidden');
         loadLives();
     };
 
