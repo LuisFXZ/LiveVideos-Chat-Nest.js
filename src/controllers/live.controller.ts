@@ -1,28 +1,40 @@
-import { Controller, Post, Get, Body, Param, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put } from '@nestjs/common';
 import { LiveService } from '../services/live.service';
 import { Live } from '../entities/live.entity';
 
-@Controller('lives')
+@Controller('api/lives')
 export class LiveController {
   constructor(private readonly liveService: LiveService) {}
 
   @Post()
-  async createLive(@Body() liveData: Partial<Live>) {
-    return await this.liveService.createLive(liveData);
+  async create(@Body() liveData: Partial<Live>): Promise<Live> {
+    try {
+      console.log('Creating live with data:', liveData);
+      liveData.isActive = true;
+      const result = await this.liveService.createLive(liveData);
+      console.log('Live created:', result);
+      return result;
+    } catch (error) {
+      console.error('Error in create live controller:', error);
+      throw error;
+    }
   }
 
   @Get()
-  async getAllLives() {
-    return await this.liveService.getAllLives();
+  async findAll(): Promise<Live[]> {
+    return this.liveService.getAllLives();
   }
 
   @Get(':id')
-  async getLive(@Param('id') id: number) {
-    return await this.liveService.getLiveById(id);
+  async findOne(@Param('id') id: string): Promise<Live> {
+    return this.liveService.getLiveById(Number(id));
   }
 
-  @Put(':id/end')
-  async endLive(@Param('id') id: number) {
-    return await this.liveService.endLive(id);
+  @Put(':id/status')
+  async updateStatus(
+    @Param('id') id: string,
+    @Body('isActive') isActive: boolean,
+  ): Promise<Live> {
+    return this.liveService.updateLiveStatus(Number(id), isActive);
   }
 }

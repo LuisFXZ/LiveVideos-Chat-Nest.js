@@ -4,77 +4,108 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Live Streaming</title>
-    <link href="styles.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="/socket.io/socket.io.js"></script>
+    <style>
+        .live-indicator {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .live-card {
+            transition: all 0.3s ease;
+        }
+
+        .live-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 min-h-screen">
     <div class="container mx-auto px-4 py-8">
-        <!-- Formulario para crear live -->
+        <!-- Header -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">Live Streaming Platform</h1>
+            <p class="text-gray-600">Crea o únete a transmisiones en vivo</p>
+        </header>
+
+        <!-- Crear Live Section -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-2xl font-bold mb-4">Crear Nuevo Live</h2>
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Crear Nuevo Live</h2>
             <form id="createLiveForm" class="space-y-4">
                 <div>
-                    <label class="block text-gray-700">Título</label>
+                    <label class="block text-gray-700 font-medium mb-2">Título</label>
                     <input type="text" name="title" required
-                           class="w-full p-2 border rounded">
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <div>
-                    <label class="block text-gray-700">Descripción</label>
+                    <label class="block text-gray-700 font-medium mb-2">Descripción</label>
                     <textarea name="description" required
-                             class="w-full p-2 border rounded"></textarea>
+                             class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                 </div>
                 <div>
-                    <label class="block text-gray-700">Nombre del Creador</label>
+                    <label class="block text-gray-700 font-medium mb-2">Nombre del Creador</label>
                     <input type="text" name="creatorName" required
-                           class="w-full p-2 border rounded">
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
                 <button type="submit" 
-                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200">
                     Crear Live
                 </button>
             </form>
         </div>
 
-        <!-- Lista de lives -->
+        <!-- Lives Activos Section -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-            <h2 class="text-2xl font-bold mb-4">Lives Disponibles</h2>
-            <div id="livesList" class="space-y-4"></div>
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Lives Disponibles</h2>
+                <div class="flex items-center space-x-2">
+                    <span class="inline-block w-3 h-3 bg-red-500 rounded-full live-indicator"></span>
+                    <span class="text-sm text-gray-600">En vivo</span>
+                </div>
+            </div>
+            <div id="livesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
 
-        <!-- Live actual -->
-        <div id="currentLive" class="hidden bg-white p-6 rounded-lg shadow-md">
-            <div id="liveDetails" class="mb-4"></div>
-            
-            <!-- Controles de streaming -->
-            <div class="mb-4">
-                <button id="startStreamBtn" class="hidden bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
-                    Iniciar Transmisión
-                </button>
-                <button id="stopStreamBtn" class="hidden bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
-                    Detener Transmisión
-                </button>
-            </div>
-
-            <!-- Videos -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <video id="localVideo" class="hidden w-full bg-black" autoplay muted></video>
-                <video id="remoteVideo" class="hidden w-full bg-black" autoplay></video>
-            </div>
-
-            <!-- Comentarios -->
-            <div class="bg-gray-50 p-4 rounded">
-                <h3 class="text-lg font-semibold mb-2">Comentarios</h3>
-                <div id="commentsList" class="space-y-2 max-h-60 overflow-y-auto mb-4"></div>
-                <form id="commentForm" class="space-y-2">
-                    <input type="text" name="userName" placeholder="Tu nombre" required
-                           class="w-full p-2 border rounded">
-                    <textarea name="content" placeholder="Escribe un comentario..." required
-                             class="w-full p-2 border rounded"></textarea>
-                    <button type="submit" 
-                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                        Enviar
+        <!-- Live Actual Section -->
+        <div id="currentLive" class="hidden">
+            <div class="bg-white p-6 rounded-lg shadow-md">
+                <div id="liveDetails" class="mb-6"></div>
+                
+                <div class="mb-4">
+                    <button id="startStreamBtn" class="hidden bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition duration-200">
+                        Iniciar Transmisión
                     </button>
-                </form>
+                    <button id="stopStreamBtn" class="hidden bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition duration-200">
+                        Detener Transmisión
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <video id="localVideo" class="hidden w-full bg-black rounded-lg" autoplay muted></video>
+                    <video id="remoteVideo" class="hidden w-full bg-black rounded-lg" autoplay></video>
+                </div>
+
+                <div class="bg-gray-50 p-6 rounded-lg">
+                    <h3 class="text-xl font-semibold mb-4">Comentarios</h3>
+                    <div id="commentsList" class="space-y-3 max-h-80 overflow-y-auto mb-4 p-4"></div>
+                    <form id="commentForm" class="space-y-3">
+                        <input type="text" name="userName" placeholder="Tu nombre" required
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <textarea name="content" placeholder="Escribe un comentario..." required
+                                 class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                        <button type="submit" 
+                                class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-200">
+                            Enviar Comentario
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
