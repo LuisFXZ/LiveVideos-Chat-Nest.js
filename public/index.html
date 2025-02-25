@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Streaming</title>
+    <link href="styles.css" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Formulario para crear live -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-2xl font-bold mb-4">Crear Nuevo Live</h2>
+            <form id="createLiveForm" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700">Título</label>
+                    <input type="text" name="title" required
+                           class="w-full p-2 border rounded">
+                </div>
+                <div>
+                    <label class="block text-gray-700">Descripción</label>
+                    <textarea name="description" required
+                             class="w-full p-2 border rounded"></textarea>
+                </div>
+                <div>
+                    <label class="block text-gray-700">Nombre del Creador</label>
+                    <input type="text" name="creatorName" required
+                           class="w-full p-2 border rounded">
+                </div>
+                <button type="submit" 
+                        class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Crear Live
+                </button>
+            </form>
+        </div>
+
+        <!-- Lista de lives -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-2xl font-bold mb-4">Lives Disponibles</h2>
+            <div id="livesList" class="space-y-4"></div>
+        </div>
+
+        <!-- Live actual -->
+        <div id="currentLive" class="hidden bg-white p-6 rounded-lg shadow-md">
+            <div id="liveDetails" class="mb-4"></div>
+            
+            <!-- Controles de streaming -->
+            <div class="mb-4">
+                <button id="startStreamBtn" class="hidden bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Iniciar Transmisión
+                </button>
+                <button id="stopStreamBtn" class="hidden bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Detener Transmisión
+                </button>
+            </div>
+
+            <!-- Videos -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <video id="localVideo" class="hidden w-full bg-black" autoplay muted></video>
+                <video id="remoteVideo" class="hidden w-full bg-black" autoplay></video>
+            </div>
+
+            <!-- Comentarios -->
+            <div class="bg-gray-50 p-4 rounded">
+                <h3 class="text-lg font-semibold mb-2">Comentarios</h3>
+                <div id="commentsList" class="space-y-2 max-h-60 overflow-y-auto mb-4"></div>
+                <form id="commentForm" class="space-y-2">
+                    <input type="text" name="userName" placeholder="Tu nombre" required
+                           class="w-full p-2 border rounded">
+                    <textarea name="content" placeholder="Escribe un comentario..." required
+                             class="w-full p-2 border rounded"></textarea>
+                    <button type="submit" 
+                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                        Enviar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
