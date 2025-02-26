@@ -212,17 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // Mostrar el enlace en la UI después de la navegación
             const shareElement = document.createElement('div');
             shareElement.className = 'mt-4 p-4 bg-gray-100 rounded';
-            shareElement.innerHTML = `
-                <p class="mb-2">Comparte este enlace con tus viewers:</p>
-                <div class="flex items-center gap-2">
-                    <input type="text" value="${shareUrl}" 
-                           class="flex-1 p-2 border rounded" readonly>
-                    <button onclick="copyShareLink()" 
-                            class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
-                        Copiar
-                    </button>
-                </div>
-            `;
             document.getElementById('liveDetails').appendChild(shareElement);
             
         } catch (error) {
@@ -395,18 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Generar y mostrar el enlace compartible
                 shareUrl = `${window.location.origin}/live/${liveId}`;
                 const shareElement = document.createElement('div');
-                shareElement.className = 'mt-4 p-4 bg-gray-100 rounded';
-                shareElement.innerHTML = `
-                    <p class="mb-2 font-medium">Comparte este enlace con tus viewers:</p>
-                    <div class="flex items-center gap-2">
-                        <input type="text" value="${shareUrl}" 
-                               class="flex-1 p-2 border rounded bg-white" readonly>
-                        <button onclick="copyShareLink()" 
-                                class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-200">
-                            Copiar
-                        </button>
-                    </div>
-                `;
                 liveDetails.appendChild(shareElement);
             } else {
                 startStreamBtn.classList.add('hidden');
