@@ -1,18 +1,18 @@
-import { Controller, Post, Get, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param } from '@nestjs/common';
 import { CommentService } from '../services/comment.service';
 import { Comment } from '../entities/comment.entity';
 
-@Controller('comments')
+@Controller('api/comments')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Post()
-  async createComment(@Body() commentData: Partial<Comment>) {
-    return await this.commentService.createComment(commentData);
+  async create(@Body() commentData: any): Promise<Comment> {
+    return this.commentService.create(commentData);
   }
 
   @Get('live/:liveId')
-  async getCommentsByLive(@Param('liveId') liveId: number) {
-    return await this.commentService.getCommentsByLiveId(liveId);
+  async findByLiveId(@Param('liveId') liveId: string): Promise<Comment[]> {
+    return this.commentService.findByLiveId(Number(liveId));
   }
 }

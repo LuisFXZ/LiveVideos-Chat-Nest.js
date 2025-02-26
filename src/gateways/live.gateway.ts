@@ -213,11 +213,20 @@ export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('newComment')
-  handleNewComment(client: Socket, { liveId, comment }) {
-    this.server.to(`live_${liveId}`).emit('commentAdded', {
-      ...comment,
-      userId: client.id,
-      timestamp: new Date()
-    });
+  async handleNewComment(client: Socket, { liveId, comment }) {
+    try {
+      const roomId = `live_${liveId}`;
+      const commentWithTimestamp = {
+        ...comment,
+        userId: client.id,
+        timestamp: new Date()
+      };
+      
+      this.server.to(roomId).emit('commentAdded', commentWithTimestamp);
+      this.logger.log(`Nuevo comentario en sala ${roomId}: ${JSON.stringify(commentWithTimestamp)}`);
+    } catch (error) {
+      this.logger.error(`Error en handleNewComment: ${error.message}`);
+      throw new WsException(error.message);
+    }
   }
 }
