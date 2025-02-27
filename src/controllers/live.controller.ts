@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Body, Param, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, ParseIntPipe } from '@nestjs/common';
 import { LiveService } from '../services/live.service';
 import { Live } from '../entities/live.entity';
 
 @Controller('api/lives')
 export class LiveController {
-  constructor(private readonly liveService: LiveService) {}
+  constructor(private readonly liveService: LiveService) { }
 
   @Post()
   async create(@Body() liveData: Partial<Live>): Promise<Live> {
@@ -37,4 +37,10 @@ export class LiveController {
   ): Promise<Live> {
     return this.liveService.updateLiveStatus(Number(id), isActive);
   }
+
+  @Delete(':id')
+  async deleteLiveId(@Param('id', ParseIntPipe) id: number) {
+    return this.liveService.deleteLive(id)
+  }
+
 }

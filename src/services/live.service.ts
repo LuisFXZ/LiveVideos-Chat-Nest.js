@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Live } from '../entities/live.entity';
@@ -74,4 +74,16 @@ export class LiveService {
   async findOne(id: number): Promise<Live> {
     return this.liveRepository.findOne({ where: { id } });
   }
+
+  async deleteLive(id: number) {
+
+    const liveFound = await this.liveRepository.findOneBy({ id: id })
+    if (!liveFound) {
+        throw new HttpException('El live no existe', HttpStatus.NOT_FOUND);
+    }
+
+    return this.liveRepository.delete(id);
+
+}
+
 }
