@@ -3,8 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let localStream = null;
     let peerConnection = null;
     const peerConnections = {};
-    const API_URL = 'http://localhost:3000/api';
-    const socket = io('http://localhost:3000', {
+    const API_URL = 'http://localhost:3456/api';
+    const socket = io('http://localhost:3456', {
         path: '/socket.io',
         transports: ['websocket']
     });
