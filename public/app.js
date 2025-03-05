@@ -3,22 +3,43 @@ document.addEventListener('DOMContentLoaded', () => {
     let localStream = null;
     let peerConnection = null;
     const peerConnections = {};
-    const API_URL = 'http://localhost:3456/api';
-    const socket = io('http://localhost:3456', {
+    
+    // Usar URL relativa o detectar automáticamente la URL del servidor
+    const API_URL = location.protocol + '//' + location.host + '/api';
+    const socket = io(location.protocol + '//' + location.host, {
         path: '/socket.io',
-        transports: ['websocket']
+        transports: ['polling', 'websocket'],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
     });
     
-    // Configuración de WebRTC
+    // Configuración mejorada de WebRTC con múltiples servidores STUN/TURN
     const configuration = {
         iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }
-        ]
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
+            // Aquí podrías agregar servidores TURN si los tienes disponibles
+            // { urls: 'turn:tu-servidor-turn.com', username: 'usuario', credential: 'contraseña' }
+        ],
+        iceCandidatePoolSize: 10
     };
 
     // Socket.IO event handlers
     socket.on('connect', () => {
         console.log('Connected to server');
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Connection error:', error);
+        // Intentar reconectar con polling si websocket falla
+        if (socket.io.opts.transports.indexOf('polling') === -1) {
+            console.log('Fallback to polling transport');
+            socket.io.opts.transports = ['polling', 'websocket'];
+            socket.connect();
+        }
     });
 
     socket.on('newStreamer', async ({ streamerId }) => {
@@ -29,6 +50,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const peerConnection = new RTCPeerConnection(configuration);
                 peerConnections[streamerId] = peerConnection;
 
+                // Monitorear estado de la conexión ICE
+                peerConnection.oniceconnectionstatechange = () => {
+                    console.log('ICE connection state:', peerConnection.iceConnectionState);
+                    
+                    if (peerConnection.iceConnectionState === 'failed' || 
+                        peerConnection.iceConnectionState === 'disconnected') {
+                        console.log('Intentando reconectar...');
+                        // Reintentar la conexión
+                        peerConnection.restartIce();
+                    }
+                };
+
                 // Configurar el video remoto cuando lleguen los tracks
                 peerConnection.ontrack = (event) => {
                     console.log('Track recibido:', event);
@@ -36,7 +69,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (remoteVideo && event.streams && event.streams[0]) {
                         remoteVideo.srcObject = event.streams[0];
                         remoteVideo.classList.remove('hidden');
-                        remoteVideo.play().catch(e => console.error('Error playing video:', e));
+                        
+                        // Asegurarse de que el video se reproduce
+                        remoteVideo.play().catch(e => {
+                            console.error('Error playing video:', e);
+                            // Reintentar la reproducción con interacción del usuario
+                            if (e.name === 'NotAllowedError') {
+                                const playButton = document.createElement('button');
+                                playButton.textContent = 'Reproducir Video';
+                                playButton.className = 'bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-200';
+                                playButton.onclick = () => {
+                                    remoteVideo.play();
+                                    playButton.remove();
+                                };
+                                document.getElementById('liveDetails').appendChild(playButton);
+                            }
+                        });
                     }
                 };
 
@@ -77,6 +125,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const peerConnection = new RTCPeerConnection(configuration);
             peerConnections[viewerId] = peerConnection;
 
+            // Monitorear estado de la conexión ICE
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('ICE connection state:', peerConnection.iceConnectionState);
+                
+                if (peerConnection.iceConnectionState === 'failed' || 
+                    peerConnection.iceConnectionState === 'disconnected') {
+                    console.log('Intentando reconectar...');
+                    // Reintentar la conexión
+                    peerConnection.restartIce();
+                }
+            };
+
             // Agregar los tracks del stream local
             localStream.getTracks().forEach(track => {
                 peerConnection.addTrack(track, localStream);
@@ -86,7 +146,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (event.candidate) {
                     socket.emit('iceCandidate', {
                         candidate: event.candidate,
-                        targetId: viewerId
+                        targetId: viewerId,
+                        liveId: currentLiveId
                     });
                 }
             };
@@ -105,6 +166,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const peerConnection = new RTCPeerConnection(configuration);
             peerConnections[viewerId] = peerConnection;
+
+            // Monitorear estado de la conexión ICE
+            peerConnection.oniceconnectionstatechange = () => {
+                console.log('ICE connection state:', peerConnection.iceConnectionState);
+                
+                if (peerConnection.iceConnectionState === 'failed' || 
+                    peerConnection.iceConnectionState === 'disconnected') {
+                    console.log('Intentando reconectar...');
+                    // Reintentar la conexión
+                    peerConnection.restartIce();
+                }
+            };
 
             // Agregar los tracks del stream local
             localStream.getTracks().forEach(track => {

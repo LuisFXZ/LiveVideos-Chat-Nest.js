@@ -14,7 +14,12 @@ import { Logger } from '@nestjs/common';
   cors: {
     origin: '*',
   },
-  transports: ['websocket']
+  transports: ['polling', 'websocket'],
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000
 })
 export class LiveGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(LiveGateway.name);
